@@ -4,17 +4,24 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tactical Dungeon Crawler</title>
+<style>
+body{background:#121212;color:#fff;font-family:monospace;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}
+#game-container{width:500px;background:#1e1e1e;padding:20px;border-radius:8px}
+#log-window{height:200px;background:#000;margin:10px 0;padding:10px;overflow-y:auto}
+button{display:block;width:100%;margin:5px 0;padding:10px;background:#333;color:#fff;border:none;cursor:pointer}
+</style>
 </head>
 
 <body>
 
 <div id="game-container">
 <h1>Dungeon Crawler</h1>
-<div id="stats-panel">
-<div>HP: <span id="stat-hp">100</span></div>
-<div>ATK: <span id="stat-atk">10</span></div>
-<div>DEF: <span id="stat-def">5</span></div>
-<div>Room: <span id="stat-room">0/8</span></div>
+
+<div>
+HP: <span id="stat-hp">100</span> |
+ATK: <span id="stat-atk">10</span> |
+DEF: <span id="stat-def">5</span> |
+Room: <span id="stat-room">0/8</span>
 </div>
 
 <div id="log-window"></div>
@@ -22,21 +29,22 @@
 </div>
 
 <script>
-const game = {
-player: { hp: 100, maxHp: 100, atk: 10, def: 5, inventory: [] },
-enemy: null,
-roomsCleared: 0,
-totalRooms: 8,
-isBossFight: false,
-gameState: "CREATION"
+const game={
+player:{hp:100,maxHp:100,atk:10,def:5,inventory:[]},
+enemy:null,
+roomsCleared:0,
+totalRooms:8,
+isBossFight:false,
+gameState:"CREATION"
 };
 
-const logWin = document.getElementById("log-window");
+const logWin=document.getElementById("log-window");
 
-function log(text, type="system"){
+function log(text){
 const entry=document.createElement("div");
 entry.innerHTML=text;
 logWin.appendChild(entry);
+logWin.scrollTop=logWin.scrollHeight;
 }
 
 function updateStats(){
@@ -46,17 +54,6 @@ document.getElementById("stat-def").innerText=game.player.def;
 document.getElementById("stat-room").innerText=`${game.roomsCleared}/${game.totalRooms}`;
 }
 
-function renderActions(){
-const panel=document.getElementById("action-panel");
-panel.innerHTML="";
-
-if(game.gameState==="COMBAT"){
-createButton(panel,"Punch",()=>executeCombatTurn("Punch"));
-createButton(panel,"Counter",()=>executeCombatTurn("Counter"));
-createButton(panel,"Quick Attack",()=>executeCombatTurn("Quick Attack"));
-}
-}
-
 function createButton(parent,text,callback){
 const btn=document.createElement("button");
 btn.innerText=text;
@@ -64,9 +61,53 @@ btn.onclick=callback;
 parent.appendChild(btn);
 }
 
+function renderActions(){
+const panel=document.getElementById("action-panel");
+panel.innerHTML="";
+
+if(game.gameState==="CREATION"){
+log("Choose your starting trait");
+
+createButton(panel,"Strong (+5 ATK)",()=>{
+game.player.atk+=5;
+startCombat();
+});
+
+createButton(panel,"Tough (+20 HP)",()=>{
+game.player.hp+=20;
+game.player.maxHp+=20;
+startCombat();
+});
+
+createButton(panel,"Defensive (+5 DEF)",()=>{
+game.player.def+=5;
+startCombat();
+});
+}
+
+else if(game.gameState==="COMBAT"){
+createButton(panel,"Punch",()=>executeCombatTurn("Punch"));
+createButton(panel,"Counter",()=>executeCombatTurn("Counter"));
+createButton(panel,"Quick Attack",()=>executeCombatTurn("Quick Attack"));
+}
+
+else if(game.gameState==="GAMEOVER"||game.gameState==="VICTORY"){
+createButton(panel,"Restart",resetGame);
+}
+}
+
+function startCombat(){
+game.enemy={hp:30,atk:8,def:3};
+game.gameState="COMBAT";
+log("A wild enemy appears!");
+renderActions();
+}
+
 function executeCombatTurn(playerMove){
 const moves=["Punch","Counter","Quick Attack"];
 const enemyMove=moves[Math.floor(Math.random()*3)];
+
+log(`You: ${playerMove} | Enemy: ${enemyMove}`);
 
 let outcome="draw";
 
@@ -103,42 +144,21 @@ updateStats();
 if(checkDeath())return;
 
 if(game.enemy.hp<=0){
-log("Enemy defeated");
-
-if(game.isBossFight){
+log("Enemy defeated!");
 game.gameState="VICTORY";
-}
-else{
-nextRoomSuccess();
-}
-
 renderActions();
 }
 
-} // ✅ FIXED missing bracket
+} 
 
 function checkDeath(){
 if(game.player.hp<=0){
 game.gameState="GAMEOVER";
-log("You died");
+log("You died!");
 renderActions();
 return true;
 }
 return false;
-}
-
-function nextRoomSuccess(){
-game.roomsCleared++;
-updateStats();
-
-if(game.roomsCleared>=game.totalRooms){
-game.gameState="VICTORY";
-}
-else{
-game.gameState="NAVIGATION";
-}
-
-renderActions();
 }
 
 function resetGame(){
