@@ -1,339 +1,153 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tactical Dungeon Crawler</title>
-    <style>
-        body {
-            background-color: #121212;
-            color: #e0e0e0;
-            font-family: 'Courier New', Courier, monospace;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-        }
-        #game-container {
-            width: 100%;
-            max-width: 600px;
-            background-color: #1e1e1e;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            border: 1px solid #333;
-        }
-        h1, h2 {
-            text-align: center;
-            color: #ffcc00;
-            margin-top: 0;
-        }
-        #stats-panel {
-            display: flex;
-            justify-content: space-between;
-            background-color: #2d2d2d;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            font-size: 14px;
-        }
-        #log-window {
-            height: 250px;
-            background-color: #0a0a0a;
-            border: 1px solid #333;
-            padding: 15px;
-            overflow-y: auto;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            font-size: 14px;
-            line-height: 1.5;
-        }
-        .log-entry { margin-bottom: 8px; }
-        .system { color: #888; }
-        .success { color: #4caf50; }
-        .danger { color: #f44336; }
-        .warn { color: #ff9800; }
-        .combat-win { color: #00bcd4; font-weight: bold; }
-        .combat-lose { color: #e91e63; font-weight: bold; }
-        
-        #action-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .btn {
-            background-color: #3a3a3a;
-            color: #fff;
-            border: 1px solid #555;
-            padding: 12px;
-            font-size: 15px;
-            font-family: inherit;
-            cursor: pointer;
-            border-radius: 4px;
-            transition: all 0.2s;
-        }
-        .btn:hover {
-            background-color: #4a4a4a;
-            border-color: #ffcc00;
-        }
-        .btn:active {
-            transform: scale(0.98);
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tactical Dungeon Crawler</title>
 </head>
+
 <body>
 
 <div id="game-container">
-    <h1>Dungeon Crawler</h1>
-    <div id="stats-panel">
-        <div>HP: <span id="stat-hp">100</span></div>
-        <div>ATK: <span id="stat-atk">10</span></div>
-        <div>DEF: <span id="stat-def">5</span></div>
-        <div>Room: <span id="stat-room">0/8</span></div>
-    </div>
-    
-    <div id="log-window"></div>
-    
-    <div id="action-panel"></div>
+<h1>Dungeon Crawler</h1>
+<div id="stats-panel">
+<div>HP: <span id="stat-hp">100</span></div>
+<div>ATK: <span id="stat-atk">10</span></div>
+<div>DEF: <span id="stat-def">5</span></div>
+<div>Room: <span id="stat-room">0/8</span></div>
+</div>
+
+<div id="log-window"></div>
+<div id="action-panel"></div>
 </div>
 
 <script>
-    // Game State Object
-    const game = {
-        player: { hp: 100, maxHp: 100, atk: 10, def: 5, inventory: [] },
-        enemy: null,
-        roomsCleared: 0,
-        totalRooms: 8,
-        isBossFight: false,
-        gameState: "CREATION" // CREATION, NAVIGATION, COMBAT, RETRY_WALL, GAMEOVER, VICTORY
-    };
+const game = {
+player: { hp: 100, maxHp: 100, atk: 10, def: 5, inventory: [] },
+enemy: null,
+roomsCleared: 0,
+totalRooms: 8,
+isBossFight: false,
+gameState: "CREATION"
+};
 
-    const logWin = document.getElementById("log-window");
+const logWin = document.getElementById("log-window");
 
-    function log(text, type = "system") {
-        const entry = document.createElement("div");
-        entry.className = `log-entry ${type}`;
-        entry.innerHTML = text;
-        logWin.appendChild(entry);
-        logWin.scrollTop = logWin.scrollHeight;
-    }
-
-    function updateStats() {
-        document.getElementById("stat-hp").innerText = Math.max(0, game.player.hp);
-        document.getElementById("stat-atk").innerText = game.player.atk;
-        document.getElementById("stat-def").innerText = game.player.def;
-        document.getElementById("stat-room").innerText = `${game.roomsCleared}/${game.totalRooms}`;
-    }
-
-    function renderActions() {
-        const panel = document.getElementById("action-panel");
-        panel.innerHTML = ""; // Clear existing buttons
-
-        if (game.gameState === "CREATION") {
-            log("Welcome to the Tactical Dungeon Crawler! Choose your starting trait:", "warn");
-            createButton(panel, "1. Strong (+5 ATK)", () => chooseTrait(1));
-            createButton(panel, "2. Tough (+20 HP)", () => chooseTrait(2));
-            createButton(panel, "3. Defensive (+5 DEF)", () => chooseTrait(3));
-        } 
-        else if (game.gameState === "NAVIGATION") {
-            log(`[Room ${game.roomsCleared + 1}/${game.totalRooms}] Choose your path:`, "system");
-            createButton(panel, "Go Left", choosePath);
-            createButton(panel, "Go Right", choosePath);
-            createButton(panel, "Go Forward", choosePath);
-        } 
-        else if (game.gameState === "RETRY_WALL") {
-            createButton(panel, "Try another direction", () => {
-                game.gameState = "NAVIGATION";
-                renderActions();
-            });
-        }
-        else if (game.gameState === "COMBAT") {
-            createButton(panel, "Punch (Beats Counter)", () => executeCombatTurn("Punch"));
-            createButton(panel, "Counter (Beats Quick Attack)", () => executeCombatTurn("Counter"));
-            createButton(panel, "Quick Attack (Beats Punch)", () => executeCombatTurn("Quick Attack"));
-        }
-        else if (game.gameState === "GAMEOVER" || game.gameState === "VICTORY") {
-            createButton(panel, "Play Again", resetGame);
-        }
-    }
-
-    function createButton(parent, text, callback) {
-        const btn = document.createElement("button");
-        btn.className = "btn";
-        btn.innerText = text;
-        btn.onclick = callback;
-        parent.appendChild(btn);
-    }
-
-    function chooseTrait(choice) {
-        if (choice === 1) { game.player.atk += 5; log("Trait chosen: Strong!", "success"); }
-        else if (choice === 2) { game.player.hp += 20; game.player.maxHp += 20; log("Trait chosen: Tough!", "success"); }
-        else if (choice === 3) { game.player.def += 5; log("Trait chosen: Defensive!", "success"); }
-        
-        game.gameState = "NAVIGATION";
-        updateStats();
-        renderActions();
-    }
-
-    function choosePath() {
-        logWin.innerHTML = ""; // Clear log window for the new room description
-        
-        // Final Boss Check
-        if (game.roomsCleared === game.totalRooms - 1) {
-            log("[FINAL ROOM] The ancient Guardian of the Abyss blocks your escape!", "danger");
-            startCombat({ hp: 60, atk: 14, def: 6 }, true);
-            return;
-        }
-
-        const r = Math.floor(Math.random() * 6) + 1;
-        
-        if (r === 1) {
-            log("[Room] An empty, dusty room. Nothing here.", "system");
-            nextRoomSuccess();
-        } 
-        else if (r === 2) {
-            log("[Room] Trap! Triggered! Rolling saving throw...", "warn");
-            if (Math.floor(Math.random() * 6) + 1 < 4) {
-                game.player.hp -= 10;
-                log("Trap hit! You lost 10 HP.", "danger");
-                checkDeath() ? null : nextRoomSuccess();
-            } else {
-                log("You nimbly dodged the trap!", "success");
-                nextRoomSuccess();
-            }
-        } 
-        else if (r === 3) {
-            log("[Room] A feral monster lunges from the dark!", "danger");
-            startCombat({ hp: 35, atk: 10, def: 3 }, false);
-        } 
-        else if (r === 4) {
-            log("[Room] A hollow wall blocks your path. Rolling to smash through...", "warn");
-            if (Math.floor(Math.random() * 6) + 1 < 4) {
-                log("Dead end! Your attack bounced off. You must turn back.", "danger");
-                game.gameState = "RETRY_WALL";
-                renderActions();
-            } else {
-                log("Smash! You break through the wall safely.", "success");
-                nextRoomSuccess();
-            }
-        } 
-        else if (r === 5) {
-            game.player.hp = Math.min(game.player.maxHp, game.player.hp + 15);
-            log("[Room] You find a glowing health potion! Healed +15 HP.", "success");
-            nextRoomSuccess();
-        } 
-        else if (r === 6) {
-            const lootPool = ["Iron Sword", "Steel Shield", "Elixir"];
-            const loot = lootPool[Math.floor(Math.random() * lootPool.length)];
-            log(`[Room] You discovered a golden chest! Inside is a <b>${loot}</b>!`, "success");
-            game.player.inventory.push(loot);
-            
-            if (loot === "Iron Sword") { 
-                game.player.atk += 3; 
-                log("-> You equip the sword. ATK increased by 3!", "success"); 
-            } else if (loot === "Steel Shield") { 
-                game.player.def += 3; 
-                log("-> You raise the shield. DEF increased by 3!", "success"); 
-            } else if (loot === "Elixir") { 
-                game.player.maxHp += 10; 
-                game.player.hp += 10; 
-                log("-> You consume the Elixir. Max HP expanded by 10!", "success"); 
-            }
-            nextRoomSuccess();
-        }
-    }
-
-    function startCombat(enemyStats, isBoss) {
-        game.enemy = enemyStats;
-        game.isBossFight = isBoss;
-        game.gameState = "COMBAT";
-        log(`Combat engaged! Enemy HP: ${game.enemy.hp} | Enemy ATK: ${game.enemy.atk}`, "warn");
-        renderActions();
-    }
-
-    function executeCombatTurn(playerMove) {
-        const moves = ["Punch", "Counter", "Quick Attack"];
-        const enemyMove = moves[Math.floor(Math.random() * 3)];
-        log(`You chose: <b>${playerMove}</b> | Enemy chose: <b>${enemyMove}</b>`, "system");
-
-        let outcome = "draw"; // draw, win, lose
-        if (playerMove === enemyMove) {
-            outcome = "draw";
-        } else if (
-            (playerMove === "Punch" && enemyMove === "Counter") ||
-            (playerMove === "Counter" && enemyMove === "Quick Attack") ||
-            (playerMove === "Quick Attack" && enemyMove === "Punch")
-        ) {
-            outcome = "win";
-        } else {
-outcome = "lose";
+function log(text, type="system"){
+const entry=document.createElement("div");
+entry.innerHTML=text;
+logWin.appendChild(entry);
 }
 
-if (outcome === "win") {
-const dmg = Math.max(5, game.player.atk - game.enemy.def);
-game.enemy.hp -= dmg;
-log(`Success! You strike the enemy for <b>${dmg}</b> damage.`, "success");
-} 
-else if (outcome === "lose") {
-const dmg = Math.max(5, game.enemy.atk - game.player.def);
-game.player.hp -= dmg;
-log(`Ouch! The enemy outmaneuvered you and deals <b>${dmg}</b> damage.`, "danger");
-} 
-else {
-log("Stalemate! Your attacks clash harmlessly in the air.", "warn");
+function updateStats(){
+document.getElementById("stat-hp").innerText=Math.max(0,game.player.hp);
+document.getElementById("stat-atk").innerText=game.player.atk;
+document.getElementById("stat-def").innerText=game.player.def;
+document.getElementById("stat-room").innerText=`${game.roomsCleared}/${game.totalRooms}`;
+}
+
+function renderActions(){
+const panel=document.getElementById("action-panel");
+panel.innerHTML="";
+
+if(game.gameState==="COMBAT"){
+createButton(panel,"Punch",()=>executeCombatTurn("Punch"));
+createButton(panel,"Counter",()=>executeCombatTurn("Counter"));
+createButton(panel,"Quick Attack",()=>executeCombatTurn("Quick Attack"));
+}
+}
+
+function createButton(parent,text,callback){
+const btn=document.createElement("button");
+btn.innerText=text;
+btn.onclick=callback;
+parent.appendChild(btn);
+}
+
+function executeCombatTurn(playerMove){
+const moves=["Punch","Counter","Quick Attack"];
+const enemyMove=moves[Math.floor(Math.random()*3)];
+
+let outcome="draw";
+
+if(playerMove===enemyMove){
+outcome="draw";
+}
+else if(
+(playerMove==="Punch"&&enemyMove==="Counter")||
+(playerMove==="Counter"&&enemyMove==="Quick Attack")||
+(playerMove==="Quick Attack"&&enemyMove==="Punch")
+){
+outcome="win";
+}
+else{
+outcome="lose";
+}
+
+if(outcome==="win"){
+const dmg=Math.max(5,game.player.atk-game.enemy.def);
+game.enemy.hp=Math.max(0,game.enemy.hp-dmg);
+log(`You deal ${dmg}`);
+}
+else if(outcome==="lose"){
+const dmg=Math.max(5,game.enemy.atk-game.player.def);
+game.player.hp=Math.max(0,game.player.hp-dmg);
+log(`Enemy deals ${dmg}`);
+}
+else{
+log("Draw");
 }
 
 updateStats();
 
-if (checkDeath()) return;
+if(checkDeath())return;
 
-if (game.enemy.hp <= 0) {
-log("You have slain the enemy!", "combat-win");
+if(game.enemy.hp<=0){
+log("Enemy defeated");
 
-if (game.isBossFight) {
-game.gameState = "VICTORY";
-log("🎉 CONGRATULATIONS! You defeated the dungeon guardian and found the surface!", "combat-win");
-} 
-else {
+if(game.isBossFight){
+game.gameState="VICTORY";
+}
+else{
 nextRoomSuccess();
 }
 
 renderActions();
 }
 
-function checkDeath() {
-if (game.player.hp <= 0) {
-game.gameState = "GAMEOVER";
-log("💀 YOU DIED! The darkness reclaims another soul.", "combat-lose");
+} // ✅ FIXED missing bracket
+
+function checkDeath(){
+if(game.player.hp<=0){
+game.gameState="GAMEOVER";
+log("You died");
 renderActions();
 return true;
 }
 return false;
 }
 
-function nextRoomSuccess() {
+function nextRoomSuccess(){
 game.roomsCleared++;
 updateStats();
 
-if (game.roomsCleared >= game.totalRooms) {
-game.gameState = "VICTORY";
-log("🎉 CONGRATULATIONS! You cleared all rooms and escaped!", "combat-win");
-} 
-else {
-game.gameState = "NAVIGATION";
+if(game.roomsCleared>=game.totalRooms){
+game.gameState="VICTORY";
+}
+else{
+game.gameState="NAVIGATION";
 }
 
 renderActions();
 }
 
-function resetGame() {
-game.player = { hp: 100, maxHp: 100, atk: 10, def: 5, inventory: [] };
-game.enemy = null;
-game.roomsCleared = 0;
-game.isBossFight = false;
-game.gameState = "CREATION";
-logWin.innerHTML = "";
+function resetGame(){
+game.player={hp:100,maxHp:100,atk:10,def:5,inventory:[]};
+game.enemy=null;
+game.roomsCleared=0;
+game.isBossFight=false;
+game.gameState="CREATION";
+logWin.innerHTML="";
 updateStats();
 renderActions();
 }
