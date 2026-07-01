@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Dungeon Crawler</title>
+<title>Tactical Dungeon Crawler</title>
 <style>
 body{background:#121212;color:#fff;font-family:monospace;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}
-#game{width:520px;background:#1e1e1e;padding:20px;border-radius:10px}
-#log{height:220px;background:#000;padding:10px;overflow-y:auto;margin:10px 0}
+#game{width:550px;background:#1e1e1e;padding:20px;border-radius:10px}
+#log{height:260px;background:#000;padding:10px;overflow-y:auto;margin:10px 0}
 button{width:100%;padding:10px;margin:5px 0;background:#333;color:#fff;border:none;cursor:pointer}
 </style>
 </head>
@@ -28,14 +28,16 @@ Room: <span id="room">0/8</span>
 
 <script>
 const game={
-player:{hp:100,maxHp:100,atk:10,def:5},
+player:{hp:100,atk:10,def:5,inventory:[]},
 enemy:null,
 room:0,
 maxRooms:8,
-state:"CREATION"
+state:"CREATION",
+isBoss:false
 };
 
 const logDiv=document.getElementById("log");
+const actions=document.getElementById("actions");
 
 function log(msg){
 const d=document.createElement("div");
@@ -45,11 +47,13 @@ logDiv.scrollTop=logDiv.scrollHeight;
 }
 
 function updateUI(){
-hp.innerText=game.player.hp;
+hp.innerText=Math.max(0,game.player.hp);
 atk.innerText=game.player.atk;
 def.innerText=game.player.def;
 room.innerText=`${game.room}/${game.maxRooms}`;
 }
+
+function clear(){actions.innerHTML="";}
 
 function btn(text,fn){
 const b=document.createElement("button");
@@ -58,7 +62,7 @@ b.onclick=fn;
 actions.appendChild(b);
 }
 
-function clear(){actions.innerHTML="";}
+function roll(){return Math.floor(Math.random()*6)+1;}
 
 function render(){
 clear();
@@ -66,20 +70,21 @@ clear();
 if(game.state==="CREATION"){
 log("Choose your trait:");
 btn("Strong (+5 ATK)",()=>{game.player.atk+=5;nextRoom();});
-btn("Tank (+20 HP)",()=>{game.player.hp+=20;game.player.maxHp+=20;nextRoom();});
-btn("Shield (+5 DEF)",()=>{game.player.def+=5;nextRoom();});
+btn("Tough (+20 HP)",()=>{game.player.hp+=20;nextRoom();});
+btn("Defensive (+5 DEF)",()=>{game.player.def+=5;nextRoom();});
 }
 
-else if(game.state==="ROOM"){
-log("Choose a path:");
-btn("⬅ Left Path",()=>enterRoom());
-btn("➡ Right Path",()=>enterRoom());
+else if(game.state==="PATH"){
+log("Choose your path:");
+btn("⬅ Left",()=>enterRoom());
+btn("➡ Right",()=>enterRoom());
+btn("⬆ Forward",()=>enterRoom());
 }
 
 else if(game.state==="COMBAT"){
-btn("Punch",()=>turn("Punch"));
-btn("Counter",()=>turn("Counter"));
-btn("Quick",()=>turn("Quick"));
+btn("Punch",()=>combatTurn("Punch"));
+btn("Counter",()=>combatTurn("Counter"));
+btn("Quick Attack",()=>combatTurn("Quick Attack"));
 }
 
 else if(game.state==="GAMEOVER"){
@@ -97,133 +102,157 @@ if(game.room>game.maxRooms){
 startBoss();
 return;
 }
-game.state="ROOM";
+game.state="PATH";
 render();
 }
 
 function enterRoom(){
-const roll=Math.random();
+const r=roll();
 
-if(roll<0.5){
-startCombat();
+if(r===1){
+log("[Room] Empty room.");
+nextRoom();
 }
-else if(roll<0.75){
+else if(r===2){
+log("[Room] Trap! Roll >=4 to avoid");
+if(roll()<4){
+game.player.hp-=10;
+log("Trap hit! -10 HP");
+}
+else log("Dodged!");
+updateUI();
+nextRoom();
+}
+else if(r===3){
+log("[Room] Monster appears!");
+startCombat(false);
+}
+else if(r===4){
+log("[Room] Wall! Roll >=4 to break");
+if(roll()<4){
+log("Dead end!");
+render();
+return;
+}
+else{
+log("Wall broken!");
+nextRoom();
+}
+}
+else if(r===5){
+log("[Room] Potion! +15 HP");
+game.player.hp+=15;
+updateUI();
+nextRoom();
+}
+else if(r===6){
 loot();
 nextRoom();
 }
-else{
-trap();
-nextRoom();
-}
 }
 
-function startCombat(){
-game.enemy={
-hp:30+game.room*10,
-atk:8+game.room*2,
-def:3+game.room
-};
+function startCombat(isBoss){
+game.isBoss=isBoss;
+game.enemy=isBoss?
+{hp:100,atk:25,def:5}:
+{hp:35,atk:10,def:3};
+
 game.state="COMBAT";
-log("Enemy appears!");
+log(isBoss?"🔥 BOSS FIGHT 🔥":"Battle starts!");
 render();
 }
 
 function startBoss(){
-game.enemy={hp:150,atk:20,def:10,boss:true};
-game.state="COMBAT";
-log("🔥 BOSS FIGHT 🔥");
-render();
+log("⚠ FINAL BOSS ⚠");
+startCombat(true);
 }
 
-function turn(p){
-const moves=["Punch","Counter","Quick"];
-const e=moves[Math.floor(Math.random()*3)];
+function combatTurn(playerMove){
+const moves=["Punch","Counter","Quick Attack"];
+const enemyMove=moves[Math.floor(Math.random()*3)];
 
-log(`You:${p} | Enemy:${e}`);
+log(`You: ${playerMove} | Enemy: ${enemyMove}`);
 
-let result="draw";
+let pMod=0.5,eMod=0.5,outcome="TIE";
 
-if(p===e) result="draw";
+if(
+(playerMove==="Punch"&&enemyMove==="Counter")||
+(playerMove==="Counter"&&enemyMove==="Quick Attack")||
+(playerMove==="Quick Attack"&&enemyMove==="Punch")
+){
+pMod=1.0;eMod=0.25;outcome="WIN";
+}
 else if(
-(p==="Punch"&&e==="Counter")||
-(p==="Counter"&&e==="Quick")||
-(p==="Quick"&&e==="Punch")
-) result="win";
-else result="lose";
-
-if(result==="win"){
-let dmg=Math.max(5,game.player.atk-game.enemy.def);
-game.enemy.hp-=dmg;
-log("You deal "+dmg);
-}
-else if(result==="lose"){
-let dmg=Math.max(5,game.enemy.atk-game.player.def);
-game.player.hp-=dmg;
-log("Enemy deals "+dmg);
-}
-else log("Draw");
-
-if(game.enemy.boss && Math.random()<0.3){
-log("Boss uses special attack!");
-game.player.hp-=15;
+(enemyMove==="Punch"&&playerMove==="Counter")||
+(enemyMove==="Counter"&&playerMove==="Quick Attack")||
+(enemyMove==="Quick Attack"&&playerMove==="Punch")
+){
+pMod=0.5;eMod=1.0;outcome="LOSE";
 }
 
-updateUI();
+log("Outcome: "+outcome);
 
-if(game.player.hp<=0){
-log("You died!");
-game.state="GAMEOVER";
-render();
-return;
-}
+let baseP=Math.max(1,game.player.atk-game.enemy.def+rand(-2,2));
+let baseE=Math.max(1,game.enemy.atk-game.player.def+rand(-2,2));
+
+let dmgP=Math.max(1,Math.floor(baseP*pMod));
+let dmgE=Math.max(1,Math.floor(baseE*eMod));
+
+game.enemy.hp-=dmgP;
+log(`You deal ${dmgP} (Enemy HP: ${Math.max(0,game.enemy.hp)})`);
 
 if(game.enemy.hp<=0){
-if(game.enemy.boss){
-log("🏆 YOU BEAT THE BOSS!");
+if(game.isBoss){
+log("🏆 YOU WIN!");
 game.state="WIN";
 render();
 return;
 }
 log("Enemy defeated!");
-heal();
 nextRoom();
 return;
 }
+
+game.player.hp-=dmgE;
+log(`Enemy deals ${dmgE} (HP: ${Math.max(0,game.player.hp)})`);
+
+updateUI();
+
+if(game.player.hp<=0){
+log("GAME OVER");
+game.state="GAMEOVER";
+render();
+}
+}
+
+function rand(min,max){
+return Math.floor(Math.random()*(max-min+1))+min;
 }
 
 function loot(){
-const type=Math.floor(Math.random()*3);
+const items=["Iron Sword","Steel Shield","Elixir"];
+const item=items[Math.floor(Math.random()*items.length)];
 
-if(type===0){
+log("[Room] Found "+item);
+game.player.inventory.push(item);
+
+if(item==="Iron Sword"){
 game.player.atk+=3;
-log("Loot: +3 ATK");
+log("+3 ATK");
 }
-if(type===1){
-game.player.def+=3;
-log("Loot: +3 DEF");
+if(item==="Steel Shield"){
+game.player.def+=2;
+log("+2 DEF");
 }
-if(type===2){
-game.player.maxHp+=10;
-game.player.hp+=10;
-log("Loot: +10 HP");
+if(item==="Elixir"){
+game.player.hp+=30;
+log("+30 HP");
 }
 updateUI();
-}
-
-function trap(){
-const dmg=10+Math.floor(Math.random()*10);
-game.player.hp-=dmg;
-log("Trap! You lose "+dmg+" HP");
-updateUI();
-}
-
-function heal(){
-game.player.hp=Math.min(game.player.maxHp,game.player.hp+15);
-log("You heal 15 HP");
 }
 
 function reset(){
-game.player={hp:100,maxHp:100,atk:10,def:5};
+game.player={hp:100,atk:10,def:5,inventory:[]};
 game.room=0;
 game.state="CREATION";
 logDiv.innerHTML="";
@@ -234,6 +263,5 @@ render();
 updateUI();
 render();
 </script>
-
 </body>
 </html>
