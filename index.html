@@ -2,178 +2,237 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tactical Dungeon Crawler</title>
+<title>Dungeon Crawler</title>
 <style>
 body{background:#121212;color:#fff;font-family:monospace;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}
-#game-container{width:500px;background:#1e1e1e;padding:20px;border-radius:8px}
-#log-window{height:200px;background:#000;margin:10px 0;padding:10px;overflow-y:auto}
-button{display:block;width:100%;margin:5px 0;padding:10px;background:#333;color:#fff;border:none;cursor:pointer}
+#game{width:520px;background:#1e1e1e;padding:20px;border-radius:10px}
+#log{height:220px;background:#000;padding:10px;overflow-y:auto;margin:10px 0}
+button{width:100%;padding:10px;margin:5px 0;background:#333;color:#fff;border:none;cursor:pointer}
 </style>
 </head>
 
 <body>
-
-<div id="game-container">
+<div id="game">
 <h1>Dungeon Crawler</h1>
 
 <div>
-HP: <span id="stat-hp">100</span> |
-ATK: <span id="stat-atk">10</span> |
-DEF: <span id="stat-def">5</span> |
-Room: <span id="stat-room">0/8</span>
+HP: <span id="hp">100</span> |
+ATK: <span id="atk">10</span> |
+DEF: <span id="def">5</span> |
+Room: <span id="room">0/8</span>
 </div>
 
-<div id="log-window"></div>
-<div id="action-panel"></div>
+<div id="log"></div>
+<div id="actions"></div>
 </div>
 
 <script>
 const game={
-player:{hp:100,maxHp:100,atk:10,def:5,inventory:[]},
+player:{hp:100,maxHp:100,atk:10,def:5},
 enemy:null,
-roomsCleared:0,
-totalRooms:8,
-isBossFight:false,
-gameState:"CREATION"
+room:0,
+maxRooms:8,
+state:"CREATION"
 };
 
-const logWin=document.getElementById("log-window");
+const logDiv=document.getElementById("log");
 
-function log(text){
-const entry=document.createElement("div");
-entry.innerHTML=text;
-logWin.appendChild(entry);
-logWin.scrollTop=logWin.scrollHeight;
+function log(msg){
+const d=document.createElement("div");
+d.innerHTML=msg;
+logDiv.appendChild(d);
+logDiv.scrollTop=logDiv.scrollHeight;
 }
 
-function updateStats(){
-document.getElementById("stat-hp").innerText=Math.max(0,game.player.hp);
-document.getElementById("stat-atk").innerText=game.player.atk;
-document.getElementById("stat-def").innerText=game.player.def;
-document.getElementById("stat-room").innerText=`${game.roomsCleared}/${game.totalRooms}`;
+function updateUI(){
+hp.innerText=game.player.hp;
+atk.innerText=game.player.atk;
+def.innerText=game.player.def;
+room.innerText=`${game.room}/${game.maxRooms}`;
 }
 
-function createButton(parent,text,callback){
-const btn=document.createElement("button");
-btn.innerText=text;
-btn.onclick=callback;
-parent.appendChild(btn);
+function btn(text,fn){
+const b=document.createElement("button");
+b.innerText=text;
+b.onclick=fn;
+actions.appendChild(b);
 }
 
-function renderActions(){
-const panel=document.getElementById("action-panel");
-panel.innerHTML="";
+function clear(){actions.innerHTML="";}
 
-if(game.gameState==="CREATION"){
-log("Choose your starting trait");
+function render(){
+clear();
 
-createButton(panel,"Strong (+5 ATK)",()=>{
-game.player.atk+=5;
+if(game.state==="CREATION"){
+log("Choose your trait:");
+btn("Strong (+5 ATK)",()=>{game.player.atk+=5;nextRoom();});
+btn("Tank (+20 HP)",()=>{game.player.hp+=20;game.player.maxHp+=20;nextRoom();});
+btn("Shield (+5 DEF)",()=>{game.player.def+=5;nextRoom();});
+}
+
+else if(game.state==="ROOM"){
+log("Choose a path:");
+btn("⬅ Left Path",()=>enterRoom());
+btn("➡ Right Path",()=>enterRoom());
+}
+
+else if(game.state==="COMBAT"){
+btn("Punch",()=>turn("Punch"));
+btn("Counter",()=>turn("Counter"));
+btn("Quick",()=>turn("Quick"));
+}
+
+else if(game.state==="GAMEOVER"){
+btn("Restart",reset);
+}
+
+else if(game.state==="WIN"){
+btn("Play Again",reset);
+}
+}
+
+function nextRoom(){
+game.room++;
+if(game.room>game.maxRooms){
+startBoss();
+return;
+}
+game.state="ROOM";
+render();
+}
+
+function enterRoom(){
+const roll=Math.random();
+
+if(roll<0.5){
 startCombat();
-});
-
-createButton(panel,"Tough (+20 HP)",()=>{
-game.player.hp+=20;
-game.player.maxHp+=20;
-startCombat();
-});
-
-createButton(panel,"Defensive (+5 DEF)",()=>{
-game.player.def+=5;
-startCombat();
-});
 }
-
-else if(game.gameState==="COMBAT"){
-createButton(panel,"Punch",()=>executeCombatTurn("Punch"));
-createButton(panel,"Counter",()=>executeCombatTurn("Counter"));
-createButton(panel,"Quick Attack",()=>executeCombatTurn("Quick Attack"));
+else if(roll<0.75){
+loot();
+nextRoom();
 }
-
-else if(game.gameState==="GAMEOVER"||game.gameState==="VICTORY"){
-createButton(panel,"Restart",resetGame);
+else{
+trap();
+nextRoom();
 }
 }
 
 function startCombat(){
-game.enemy={hp:30,atk:8,def:3};
-game.gameState="COMBAT";
-log("A wild enemy appears!");
-renderActions();
+game.enemy={
+hp:30+game.room*10,
+atk:8+game.room*2,
+def:3+game.room
+};
+game.state="COMBAT";
+log("Enemy appears!");
+render();
 }
 
-function executeCombatTurn(playerMove){
-const moves=["Punch","Counter","Quick Attack"];
-const enemyMove=moves[Math.floor(Math.random()*3)];
-
-log(`You: ${playerMove} | Enemy: ${enemyMove}`);
-
-let outcome="draw";
-
-if(playerMove===enemyMove){
-outcome="draw";
+function startBoss(){
+game.enemy={hp:150,atk:20,def:10,boss:true};
+game.state="COMBAT";
+log("🔥 BOSS FIGHT 🔥");
+render();
 }
+
+function turn(p){
+const moves=["Punch","Counter","Quick"];
+const e=moves[Math.floor(Math.random()*3)];
+
+log(`You:${p} | Enemy:${e}`);
+
+let result="draw";
+
+if(p===e) result="draw";
 else if(
-(playerMove==="Punch"&&enemyMove==="Counter")||
-(playerMove==="Counter"&&enemyMove==="Quick Attack")||
-(playerMove==="Quick Attack"&&enemyMove==="Punch")
-){
-outcome="win";
+(p==="Punch"&&e==="Counter")||
+(p==="Counter"&&e==="Quick")||
+(p==="Quick"&&e==="Punch")
+) result="win";
+else result="lose";
+
+if(result==="win"){
+let dmg=Math.max(5,game.player.atk-game.enemy.def);
+game.enemy.hp-=dmg;
+log("You deal "+dmg);
 }
-else{
-outcome="lose";
+else if(result==="lose"){
+let dmg=Math.max(5,game.enemy.atk-game.player.def);
+game.player.hp-=dmg;
+log("Enemy deals "+dmg);
+}
+else log("Draw");
+
+if(game.enemy.boss && Math.random()<0.3){
+log("Boss uses special attack!");
+game.player.hp-=15;
 }
 
-if(outcome==="win"){
-const dmg=Math.max(5,game.player.atk-game.enemy.def);
-game.enemy.hp=Math.max(0,game.enemy.hp-dmg);
-log(`You deal ${dmg}`);
-}
-else if(outcome==="lose"){
-const dmg=Math.max(5,game.enemy.atk-game.player.def);
-game.player.hp=Math.max(0,game.player.hp-dmg);
-log(`Enemy deals ${dmg}`);
-}
-else{
-log("Draw");
-}
+updateUI();
 
-updateStats();
-
-if(checkDeath())return;
+if(game.player.hp<=0){
+log("You died!");
+game.state="GAMEOVER";
+render();
+return;
+}
 
 if(game.enemy.hp<=0){
+if(game.enemy.boss){
+log("🏆 YOU BEAT THE BOSS!");
+game.state="WIN";
+render();
+return;
+}
 log("Enemy defeated!");
-game.gameState="VICTORY";
-renderActions();
+heal();
+nextRoom();
+return;
+}
 }
 
-} 
+function loot(){
+const type=Math.floor(Math.random()*3);
 
-function checkDeath(){
-if(game.player.hp<=0){
-game.gameState="GAMEOVER";
-log("You died!");
-renderActions();
-return true;
+if(type===0){
+game.player.atk+=3;
+log("Loot: +3 ATK");
 }
-return false;
+if(type===1){
+game.player.def+=3;
+log("Loot: +3 DEF");
 }
-
-function resetGame(){
-game.player={hp:100,maxHp:100,atk:10,def:5,inventory:[]};
-game.enemy=null;
-game.roomsCleared=0;
-game.isBossFight=false;
-game.gameState="CREATION";
-logWin.innerHTML="";
-updateStats();
-renderActions();
+if(type===2){
+game.player.maxHp+=10;
+game.player.hp+=10;
+log("Loot: +10 HP");
+}
+updateUI();
 }
 
-updateStats();
-renderActions();
+function trap(){
+const dmg=10+Math.floor(Math.random()*10);
+game.player.hp-=dmg;
+log("Trap! You lose "+dmg+" HP");
+updateUI();
+}
+
+function heal(){
+game.player.hp=Math.min(game.player.maxHp,game.player.hp+15);
+log("You heal 15 HP");
+}
+
+function reset(){
+game.player={hp:100,maxHp:100,atk:10,def:5};
+game.room=0;
+game.state="CREATION";
+logDiv.innerHTML="";
+updateUI();
+render();
+}
+
+updateUI();
+render();
 </script>
 
 </body>
