@@ -267,22 +267,80 @@
         ) {
             outcome = "win";
         } else {
-outcome = "lose";}if (outcome === "win") {const dmg = Math.max(5, game.player.atk - game.enemy.def);
-                                          game.enemy.hp -= dmg;log(Success! You strike the enemy for <b>${dmg}</b> damage., "success");} else if (outcome === "lose") {const dmg = Math.max(5, game.enemy.atk - game.player.def);game.player.hp -= dmg;log(Ouch! The enemy outmaneuvered you and deals <b>${dmg}</b> damage., "danger");} else {log("Stalemate! Your attacks clash harmlessly in the air.", "warn");}updateStats();
-        if (checkDeath()) return;
-        if (game.enemy.hp <= 0) {log("You have slain the enemy!", "combat-win");
-                                 if (game.isBossFight) {game.gameState = "VICTORY";
-                                                        log("🎉 CONGRATULATIONS! You defeated the dungeon guardian and found the surface!", "combat-win");} else {nextRoomSuccess();}renderActions();}}function checkDeath() {if (game.player.hp <= 0) {game.gameState = "GAMEOVER";
-                                                                                                                                                                                                                                                       log("💀 YOU DIED! The darkness reclaims another soul.", "combat-lose");
-                                                                                                                                                                                                                                                       renderActions();
-                                                                                                                                                                                                                                                       return true;}return false;}function nextRoomSuccess() {game.roomsCleared++;updateStats();
-                                                                                                                                                                                                                                                                                                              if (game.roomsCleared >= game.totalRooms) {game.gameState = "VICTORY";
-                                                                                                                                                                                                                                                                                                                                                         log("🎉 CONGRATULATIONS! You cleared all rooms and escaped!", "combat-win");} else {game.gameState = "NAVIGATION";}renderActions();}function resetGame() {game.player = { hp: 100, maxHp: 100, atk: 10, def: 5, inventory: [] };
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  game.enemy = null;
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  game.roomsCleared = 0;
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  game.isBossFight = false;
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  game.gameState = "CREATION";logWin.innerHTML = "";updateStats();renderActions();}// Initialize Game on Window LoadupdateStats();renderActions();
-    </script>
+outcome = "lose";
+}
+
+if (outcome === "win") {
+const dmg = Math.max(5, game.player.atk - game.enemy.def);
+game.enemy.hp -= dmg;
+log(`Success! You strike the enemy for <b>${dmg}</b> damage.`, "success");
+} 
+else if (outcome === "lose") {
+const dmg = Math.max(5, game.enemy.atk - game.player.def);
+game.player.hp -= dmg;
+log(`Ouch! The enemy outmaneuvered you and deals <b>${dmg}</b> damage.`, "danger");
+} 
+else {
+log("Stalemate! Your attacks clash harmlessly in the air.", "warn");
+}
+
+updateStats();
+
+if (checkDeath()) return;
+
+if (game.enemy.hp <= 0) {
+log("You have slain the enemy!", "combat-win");
+
+if (game.isBossFight) {
+game.gameState = "VICTORY";
+log("🎉 CONGRATULATIONS! You defeated the dungeon guardian and found the surface!", "combat-win");
+} 
+else {
+nextRoomSuccess();
+}
+
+renderActions();
+}
+
+function checkDeath() {
+if (game.player.hp <= 0) {
+game.gameState = "GAMEOVER";
+log("💀 YOU DIED! The darkness reclaims another soul.", "combat-lose");
+renderActions();
+return true;
+}
+return false;
+}
+
+function nextRoomSuccess() {
+game.roomsCleared++;
+updateStats();
+
+if (game.roomsCleared >= game.totalRooms) {
+game.gameState = "VICTORY";
+log("🎉 CONGRATULATIONS! You cleared all rooms and escaped!", "combat-win");
+} 
+else {
+game.gameState = "NAVIGATION";
+}
+
+renderActions();
+}
+
+function resetGame() {
+game.player = { hp: 100, maxHp: 100, atk: 10, def: 5, inventory: [] };
+game.enemy = null;
+game.roomsCleared = 0;
+game.isBossFight = false;
+game.gameState = "CREATION";
+logWin.innerHTML = "";
+updateStats();
+renderActions();
+}
+
+updateStats();
+renderActions();
+</script>
 
 </body>
 </html>
